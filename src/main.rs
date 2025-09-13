@@ -88,14 +88,16 @@ async fn read_temperature(
 
 #[tokio::main]
 async fn main() {
-    let mut args: Vec<String> = env::args().collect();
+    let mut args = env::args();
+    let program = args.next().unwrap(); // skip program name
 
-    if args.len() < 2 {
-        println!("Need an argument for label");
-        return;
-    }
+    let label = args.next().unwrap_or_else(|| {
+        eprintln!("Usage: {} <label> [port]", program);
+        std::process::exit(1);
+    });
 
-    let label = args.pop().unwrap();
+    let port: u16 = args.next().and_then(|p| p.parse().ok()).unwrap_or(9090);
+
     let metrics = Metrics {
         temperature: Family::default(),
     };
@@ -124,7 +126,8 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root))
         .route("/metrics", get(metricspage).with_state(state));
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:9090").await.unwrap();
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
