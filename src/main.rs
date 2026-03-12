@@ -12,7 +12,7 @@ use prometheus_client::{encoding::text::encode, metrics::gauge::Gauge};
 use std::sync::atomic::AtomicU32;
 use thiserror::Error;
 use tokio::fs::read_dir;
-use tokio::time::{Duration, sleep};
+use tokio::time::{Duration, Instant, sleep};
 
 use std::env;
 use std::fs;
@@ -62,7 +62,7 @@ async fn get_w1path(dir: &Path) -> Result<String, SPError> {
 async fn read_temperature(
     inst: InstanceLabels,
     metrics: Arc<Mutex<Metrics>>,
-) -> Result<bool, SPError> {
+) -> Result<f32, SPError> {
     let w1_path = Path::new("/sys/bus/w1/devices/");
     let dir = match get_w1path(w1_path).await {
         Ok(dir) => dir,
@@ -83,7 +83,7 @@ async fn read_temperature(
         .temperature
         .get_or_create(&inst)
         .set(temp);
-    Ok(true)
+    Ok(temp)
 }
 
 #[tokio::main]
@@ -115,9 +115,28 @@ async fn main() {
     let inst = InstanceLabels { topic: label };
 
     tokio::spawn(async move {
+        let mut last_temp: Option<f32> = None;
+        let mut same_since: Option<Instant> = None;
+        const STUCK_THRESHOLD: Duration = Duration::from_secs(15 * 60);
+
         loop {
-            if let Err(error) = read_temperature(inst.to_owned(), metrics.clone()).await {
-                println!("{}", error);
+            match read_temperature(inst.to_owned(), metrics.clone()).await {
+                Ok(temp) => {
+                    if last_temp == Some(temp) {
+                        let since = same_since.get_or_insert_with(Instant::now);
+                        if since.elapsed() >= STUCK_THRESHOLD {
+                            eprintln!(
+                                "Temperature has been stuck at {:.3}°C for 15 minutes. Exiting.",
+                                temp
+                            );
+                            std::process::exit(1);
+                        }
+                    } else {
+                        last_temp = Some(temp);
+                        same_since = None;
+                    }
+                }
+                Err(error) => println!("{}", error),
             }
             sleep(Duration::from_millis(1000)).await;
         }
