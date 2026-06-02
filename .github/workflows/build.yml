@@ -10,7 +10,7 @@ jobs:
       matrix:
         os: ["ubuntu-latest"]
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: hecrj/setup-rust-action@v2.0.1
 
@@ -23,7 +23,7 @@ jobs:
   check-format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: hecrj/setup-rust-action@v2.0.1
         with:
           rust-version: stable
@@ -33,7 +33,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: hecrj/setup-rust-action@v2.0.1
         with:
